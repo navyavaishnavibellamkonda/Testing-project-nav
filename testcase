@@ -1,1 +1,10 @@
 testing purpose 
+log.error("### entered into test rule");
+	log.info("### entered into test rule");
+	log.debug("### entered into test rule");
+	log.warn("### entered into test rule");
+	if(identity != null){
+	String name = identity.getName();
+	if(name.equals("104789"))
+	return true;
+	}
