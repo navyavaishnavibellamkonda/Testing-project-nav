@@ -72,3 +72,71 @@ if (!inactive && (null != workerType && workerType.equalsIgnoreCase("Employee"))
 
 log.error("================AIG-Rule-AssignmentRule-Employee-BusinessRole ends====================");
 return false;
+
+
+
+import org.apache.log4j.Logger;
+import sailpoint.object.Identity;
+import sailpoint.object.Custom;
+import sailpoint.object.Link;
+import sailpoint.object.*;
+import sailpoint.tools.Util;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+Logger log = Logger.getLogger("com.aig.rule.FTERule");
+
+log.error("================AIG-Rule-AssignmentRule-FTE-Employee-BusinessRole starts====================");
+
+String country = null;
+String workerType = null;
+String eidActivationDate = null;
+
+boolean inactive = false;
+boolean countryExcluded = false;
+boolean eidDateValid = false;
+boolean workerTypeValid = false;
+
+workerType = identity.getStringAttribute("workerType");
+log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole workerType==" + workerType);
+inactive = identity.isInactive();
+log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole inactive==" + inactive);
+
+if (null != workerType && (workerType.equalsIgnoreCase("Employee") || workerType.equalsIgnoreCase("Contractor"))) { workerTypeValid = true; }
+
+country = identity.getStringAttribute("country");
+log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole country==" + country);
+
+if (null != country && !country.equalsIgnoreCase("KP")) { countryExcluded = true; }
+
+eidActivationDate = identity.getStringAttribute("aigCustom22");
+log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole eidActivationDate==" + eidActivationDate);
+
+if (null != eidActivationDate && !eidActivationDate.trim().isEmpty()) {
+    try {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
+        Date activationDate = sdf.parse(eidActivationDate.trim());
+        Date cutoffDate = sdf.parse("20260912");
+        if (activationDate.after(cutoffDate)) { eidDateValid = true; }
+    } catch (Exception e) {
+        log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole error parsing eidActivationDate: " + e.getMessage());
+    }
+}
+
+if (!inactive && workerTypeValid && countryExcluded && eidDateValid) {
+    List links = identity.getLinks();
+    if (null != links && !links.isEmpty()) {
+        for (Link link : links) {
+            if (!link.isDisabled() && link.getApplicationName().equalsIgnoreCase("R1-Core")) {
+                log.error("START AIG-Rule-IdentitySelector-EmployeeOnly-Core found Active R1-core link");
+                String nativeIdentity = link.getNativeIdentity();
+                if (null != nativeIdentity || nativeIdentity != "") {
+                    if (!nativeIdentity.toUpperCase().startsWith("CN=(PRV)") && !nativeIdentity.toUpperCase().startsWith("CN=PRV")) { return true; }
+                }
+            }
+        }
+    }
+}
+
+log.error("================AIG-Rule-AssignmentRule-Employee-BusinessRole ends====================");
+return false;
