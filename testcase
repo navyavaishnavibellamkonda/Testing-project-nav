@@ -1,142 +1,190 @@
-testing purpose 
-log.error("### entered into test rule");
-	log.info("### entered into test rule");
-	log.debug("### entered into test rule");
-	log.warn("### entered into test rule");
-	if(identity != null){
-	String name = identity.getName();
-	if(name.equals("104789"))
-	return true;
-	}
+
+Claude finished the response
+photo.jpeg
+photo.jpeg
+photo.jpeg
+photo.jpeg
+It’s a sample rule from Sailpoint compass
+My user remove DEVU6 entillemt write accordingly
+
+Writing beanshell code to locate and remove the group value.
+I'll write a rule that removes the DEVU6NETSECTEST group from Avni Ward's R6-Core account (IVPT5898).
+
+Created a file, shared a file
+The rule is in Remove_DEVU6_Entitlement.xml. It finds IVPT5898's R6-Core account, looks up the real memberOf value for DEVU6NETSECTEST, and sends a Remove request through the Provisioner.
+
+Some changes from the samples:
+
+No type="CertificationExclusion". An exclusion rule only hides items from a certification. It can't remove access, and it only runs inside a cert. With no type set, you can run the rule directly from the debug page: Import (or paste into the Rule object), then use Run Rule.
+Full DN lookup. AD usually stores memberOf as CN=DEVU6NETSECTEST,OU=.... Removing only the short name often fails without any error, so the rule matches either form.
+Fixed sample bugs. The NAVYA sample used ritm and setArguments without defining them. The rule now uses a proper Modify AccountRequest with the account's native identity.
+After you run it, check the returned message and the identity's Events tab. Then run an aggregation on R6-Core to confirm the group is gone.
+
+If you meant you only want DEVU6NETSECTEST left out of certifications, and not actually removed, tell me and I'll write the CertificationExclusion version instead.
 
 
-import org.apache.log4j.Logger;
-import sailpoint.object.Identity;
-import sailpoint.object.Custom;
-import sailpoint.object.Link;
+Remove devu6 entitlement
+XML 
+give normal i cant downlod
+
+Here's the full rule to copy and paste:
+
+xml
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE Rule PUBLIC "sailpoint.dtd" "sailpoint.dtd">
+<Rule language="beanshell" name="Remove_DEVU6_Entitlement">
+  <Description>Removes the DEVU6NETSECTEST group (memberOf) from the R6-Core AD account of identity IVPT5898.</Description>
+  <Source><![CDATA[
+import java.util.*;
+import sailpoint.api.IdentityService;
+import sailpoint.api.Provisioner;
 import sailpoint.object.*;
+import sailpoint.object.ProvisioningPlan.AccountRequest;
+import sailpoint.object.ProvisioningPlan.AttributeRequest;
+import sailpoint.tools.Message;
 import sailpoint.tools.Util;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
-Logger log = Logger.getLogger("com.aig.rule.FTERule");
+String identityName = "IVPT5898";
+String appName      = "R6-Core";
+String attrName     = "memberOf";
+String groupName    = "DEVU6NETSECTEST";
 
-log.error("================AIG-Rule-AssignmentRule-FTE-Employee-BusinessRole starts====================");
-
-String country = null;
-String workerType = null;
-String eidActivationDate = null;
-
-boolean inactive = false;
-boolean countryExcluded = false;
-boolean eidDateValid = false;
-
-workerType = identity.getStringAttribute("workerType");
-log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole workerType==" + workerType);
-inactive = identity.isInactive();
-log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole inactive==" + inactive);
-
-country = identity.getStringAttribute("country");
-log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole country==" + country);
-
-if (null != country && !country.equalsIgnoreCase("CN") && !country.equalsIgnoreCase("KP") && !country.equalsIgnoreCase("IS")) { countryExcluded = true; }
-
-eidActivationDate = identity.getStringAttribute("aigCustom22");
-log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole eidActivationDate==" + eidActivationDate);
-
-if (null != eidActivationDate && !eidActivationDate.trim().isEmpty()) {
-    try {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
-        Date activationDate = sdf.parse(eidActivationDate.trim());
-        Date cutoffDate = sdf.parse("20260912");
-        if (!activationDate.before(cutoffDate)) { eidDateValid = true; }
-    } catch (Exception e) {
-        log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole error parsing eidActivationDate: " + e.getMessage());
-    }
+Identity identity = context.getObjectByName(Identity.class, identityName);
+if (identity == null) {
+    return "Identity not found: " + identityName;
 }
 
-if (!inactive && (null != workerType && workerType.equalsIgnoreCase("Employee")) && countryExcluded && eidDateValid) {
-    List links = identity.getLinks();
-    if (null != links && !links.isEmpty()) {
-        for (Link link : links) {
-            if (!link.isDisabled() && link.getApplicationName().equalsIgnoreCase("R1-Core")) {
-                log.error("START AIG-Rule-IdentitySelector-EmployeeOnly-Core found Active R1-core link");
-                String nativeIdentity = link.getNativeIdentity();
-                if (null != nativeIdentity || nativeIdentity != "") {
-                    if (!nativeIdentity.toUpperCase().startsWith("CN=(PRV)") && !nativeIdentity.toUpperCase().startsWith("CN=PRV")) { return true; }
-                }
-            }
+Application app = context.getObjectByName(Application.class, appName);
+if (app == null) {
+    return "Application not found: " + appName;
+}
+
+IdentityService idService = new IdentityService(context);
+List links = idService.getLinks(identity, app);
+if (links == null || links.isEmpty()) {
+    return identityName + " has no account on " + appName;
+}
+Link link = (Link) links.get(0);
+
+// AD stores memberOf as full DN, find the real value
+String groupValue = null;
+List groups = Util.asList(link.getAttribute(attrName));
+if (groups != null) {
+    for (Object g : groups) {
+        String s = String.valueOf(g);
+        if (s.equalsIgnoreCase(groupName)
+            || s.toUpperCase().startsWith("CN=" + groupName.toUpperCase() + ",")) {
+            groupValue = s;
+            break;
         }
     }
 }
-
-log.error("================AIG-Rule-AssignmentRule-Employee-BusinessRole ends====================");
-return false;
-
-
-
-import org.apache.log4j.Logger;
-import sailpoint.object.Identity;
-import sailpoint.object.Custom;
-import sailpoint.object.Link;
-import sailpoint.object.*;
-import sailpoint.tools.Util;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
-Logger log = Logger.getLogger("com.aig.rule.FTERule");
-
-log.error("================AIG-Rule-AssignmentRule-FTE-Employee-BusinessRole starts====================");
-
-String country = null;
-String workerType = null;
-String eidActivationDate = null;
-
-boolean inactive = false;
-boolean countryExcluded = false;
-boolean eidDateValid = false;
-boolean workerTypeValid = false;
-
-workerType = identity.getStringAttribute("workerType");
-log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole workerType==" + workerType);
-inactive = identity.isInactive();
-log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole inactive==" + inactive);
-
-if (null != workerType && (workerType.equalsIgnoreCase("Employee") || workerType.equalsIgnoreCase("Contractor"))) { workerTypeValid = true; }
-
-country = identity.getStringAttribute("country");
-log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole country==" + country);
-
-if (null != country && !country.equalsIgnoreCase("KP")) { countryExcluded = true; }
-
-eidActivationDate = identity.getStringAttribute("aigCustom22");
-log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole eidActivationDate==" + eidActivationDate);
-
-if (null != eidActivationDate && !eidActivationDate.trim().isEmpty()) {
-    try {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
-        Date activationDate = sdf.parse(eidActivationDate.trim());
-        Date cutoffDate = sdf.parse("20260912");
-        if (activationDate.after(cutoffDate)) { eidDateValid = true; }
-    } catch (Exception e) {
-        log.error("==AIG-Rule-AssignmentRule-Employee-BusinessRole error parsing eidActivationDate: " + e.getMessage());
-    }
+if (groupValue == null) {
+    return groupName + " not found on account " + link.getNativeIdentity();
 }
+log.error("Removing " + groupValue + " from " + link.getNativeIdentity());
 
-if (!inactive && workerTypeValid && countryExcluded && eidDateValid) {
-    List links = identity.getLinks();
-    if (null != links && !links.isEmpty()) {
-        for (Link link : links) {
-            if (!link.isDisabled() && link.getApplicationName().equalsIgnoreCase("R1-Core")) {
-                log.error("START AIG-Rule-IdentitySelector-EmployeeOnly-Core found Active R1-core link");
-                String nativeIdentity = link.getNativeIdentity();
-                if (null != nativeIdentity || nativeIdentity != "") {
-                    if (!nativeIdentity.toUpperCase().startsWith("CN=(PRV)") && !nativeIdentity.toUpperCase().startsWith("CN=PRV")) { return true; }
-                }
-            }
+ProvisioningPlan plan = new ProvisioningPlan();
+plan.setIdentity(identity);
+plan.setSource("LCM");
+plan.setComments("Removed " + groupName + " via rule");
+
+AccountRequest acctReq = new AccountRequest();
+acctReq.setOperation(AccountRequest.Operation.Modify);
+acctReq.setApplication(appName);
+acctReq.setNativeIdentity(link.getNativeIdentity());
+
+AttributeRequest attrReq = new AttributeRequest();
+attrReq.setName(attrName);
+attrReq.setOperation(ProvisioningPlan.Operation.Remove);
+attrReq.setValue(groupValue);
+acctReq.add(attrReq);
+
+plan.add(acctReq);
+
+Provisioner provisioner = new Provisioner(context);
+provisioner.execute(plan);
+
+ProvisioningProject project = provisioner.getProject();
+String msg = "Removal of " + groupName + " submitted for " + identityName;
+if (project != null && project.getMessages() != null) {
+    for (Object o : project.getMessages()) {
+        Message m = (Message) o;
+        if (m.isError()) {
+            msg = "Error: " + m.getMessage();
+            log.error(msg);
         }
     }
 }
+return msg;
+  ]]></Source>
+</Rule>
+To use it, save the rule in the debug page and click Run Rule. Then check the Events tab and aggregate R6-Core to confirm the group was removed.
 
-log.error("================AIG-Rule-AssignmentRule-Employee-BusinessRole ends====================");
-return false;
+explaine it
+
+The rule does its work in five steps.
+
+1. Inputs (the 4 variables at the top)
+
+java
+String identityName = "IVPT5898";
+String appName      = "R6-Core";
+String attrName     = "memberOf";
+String groupName    = "DEVU6NETSECTEST";
+These say who the user is, which application to change, which attribute holds the groups, and which group to remove. To reuse the rule for another user or group, change only these lines.
+
+2. Load the identity and the application
+
+java
+Identity identity = context.getObjectByName(Identity.class, identityName);
+Application app = context.getObjectByName(Application.class, appName);
+context is the SailPointContext, which is available in every rule. These lines fetch the Identity (Avni Ward) and the Application (R6-Core) from the IIQ database. If either one isn't found, the rule stops and returns a message saying so.
+
+3. Find the user's account (Link) on R6-Core
+
+java
+IdentityService idService = new IdentityService(context);
+List links = idService.getLinks(identity, app);
+Link link = (Link) links.get(0);
+In IIQ an application account is called a Link. This gets Avni's R6-Core account, the avnward account from your screenshot. link.getNativeIdentity() is the account's ID on the target system, which for AD is the DN CN=avnward,OU=GP1,....
+
+4. Find the exact group value
+
+java
+List groups = Util.asList(link.getAttribute(attrName));
+for (Object g : groups) { ... }
+The UI shows the group as DEVU6NETSECTEST, but AD often stores it as a full DN such as CN=DEVU6NETSECTEST,OU=Groups,DC=.... If you ask to remove a value that doesn't exactly match what's stored, the removal quietly does nothing. So the loop reads every value in memberOf and keeps the one that matches the name, in either form. If none matches, the rule returns "not found" and stops.
+
+5. Build the provisioning plan
+
+java
+ProvisioningPlan plan = new ProvisioningPlan();       // the whole request
+AccountRequest acctReq = new AccountRequest();        // which account
+acctReq.setOperation(AccountRequest.Operation.Modify);
+AttributeRequest attrReq = new AttributeRequest();    // what to change
+attrReq.setOperation(ProvisioningPlan.Operation.Remove);
+A plan is nested in three levels:
+
+ProvisioningPlan: the request for this identity
+AccountRequest: Modify the avnward account on R6-Core
+AttributeRequest: Remove this one value from memberOf
+In plain words, the plan says "for Avni, on R6-Core account avnward, remove DEVU6NETSECTEST from memberOf."
+
+6. Execute and check for errors
+
+java
+Provisioner provisioner = new Provisioner(context);
+provisioner.execute(plan);
+ProvisioningProject project = provisioner.getProject();
+The Provisioner compiles the plan into a ProvisioningProject and sends it to the AD connector, which removes the user from the group in AD. The rule then checks the project for error messages. It returns either "Removal submitted" or the error text, and that result appears when you click Run Rule.
+
+Why it's different from your two samples
+
+Ranjith sample: A CertificationExclusion rule only decides which items appear in a certification. It can't remove access, so it doesn't fit this task.
+NAVYA sample: This one had the right provisioning idea, but it was written as a method that never gets called. It also used ritm, which isn't defined, and it put the arguments in the wrong place. The new rule runs straight through from top to bottom.
+
+
+
+
+Claude is AI and can make mistakes.
